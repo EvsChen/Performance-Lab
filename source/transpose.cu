@@ -78,30 +78,32 @@ void preprocess(float *res, float *dev_res, int n)
     cudaMemset(dev_res, -1, n * sizeof(float));
 }
 
-// TODO: COMPLETE THIS
+
 __global__ void copyKernel(const float* const a, float* const b)
 {
-    int i = 0;  // Compute correctly - Global X index
-    int j = 0;  // Compute correctly - Global Y index
+    int i = (blockIdx.x * blockDim.x) + threadIdx.x;  // Compute correctly - Global X index
+    int j = (blockIdx.y * blockDim.y) + threadIdx.y;  // Compute correctly - Global Y index
 
     // Check if i or j are out of bounds. If they are, return.
+    if (i >= sizeX || j >= sizeY) return;
 
-    int index = 0;      // Compute 1D index from i, j
+    int index = i + j * sizeX;      // Compute 1D index from i, j
 
     // Copy data from A to B
     b[index] = a[index];
 }
 
-// TODO: COMPLETE THIS
+
 __global__ void matrixTransposeNaive(const float* const a, float* const b)
 {
-    int i = 0;  // Compute correctly - Global X index
-    int j = 0;  // Compute correctly - Global Y index
+    int i = (blockIdx.x * blockDim.x) + threadIdx.x;  // Compute correctly - Global X index
+    int j = (blockIdx.y * blockDim.y) + threadIdx.y;  // Compute correctly - Global Y index
 
     // Check if i or j are out of bounds. If they are, return.
+    if (i >= sizeX || j >= sizeY) return;
 
-    int index_in = 0;  // Compute input index (i,j) from matrix A
-    int index_out = 0;  // Compute output index (j,i) in matrix B = transpose(A)
+    int index_in = i + j * sizeX;  // Compute input index (i,j) from matrix A
+    int index_out = j + i * sizeY;  // Compute output index (j,i) in matrix B = transpose(A)
 
     // Copy data from A to B using transpose indices
     b[index_out] = a[index_in];
@@ -117,8 +119,9 @@ __global__ void matrixTransposeShared(const float* const a, float* const b)
     // Compute input and output index
     int bx = 0;     // Compute block offset - this is number of global threads in X before this block
     int by = 0;     // Compute block offset - this is number of global threads in Y before this block
-    int i  = 0;     // Global input x index - Same as previous kernels
-    int j  = 0;     // Global input y index - Same as previous kernels
+    int i = (blockIdx.x * blockDim.x) + threadIdx.x;  // Compute correctly - Global X index
+    int j = (blockIdx.y * blockDim.y) + threadIdx.y;  // Compute correctly - Global Y index
+
 
     // We are transposing the blocks here. See how ti uses by and tj uses bx
     // We transpose blocks using indices, and transpose with block sub-matrix using the shared memory
@@ -249,10 +252,11 @@ int main(int argc, char *argv[])
         // TODO: COMPLETE THIS
         // Assign a 2D distribution of BS_X x BS_Y x 1 CUDA threads within
         // Calculate number of blocks along X and Y in a 2D CUDA "grid"
+        int blockSize = 16;
         DIMS dims;
-        dims.dimBlock = dim3(1, 1, 1);
-        dims.dimGrid  = dim3(1,
-                             1,
+        dims.dimBlock = dim3(16, 16, 1);
+        dims.dimGrid  = dim3((sizeX + blockSize - 1) / blockSize,
+                             (sizeY + blockSize - 1) / blockSize,
                              1);
 
         // start the timer
